@@ -9,6 +9,7 @@ authors = [
 requires-python = ">=3.14"
 dependencies = [
     "fastapi>=0.141.1",
+    "groq>=1.7.0",
     "httpx>=0.28.1",
     "pandas>=3.0.5",
     "pymongo>=4.15.0",
@@ -16,8 +17,11 @@ dependencies = [
 ]
 
 [project.scripts]
-pilot-study-project = "pilot-study-project:main"
+pilot-study-project = "app:main"
 
 [build-system]
 requires = ["uv_build>=0.12.2,<0.13.0"]
 build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "app"

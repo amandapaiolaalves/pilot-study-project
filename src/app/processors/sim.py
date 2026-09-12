@@ -11,6 +11,35 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+UF_BY_IBGE_CODE = {
+    "11": "RO",
+    "12": "AC",
+    "13": "AM",
+    "14": "RR",
+    "15": "PA",
+    "16": "AP",
+    "17": "TO",
+    "21": "MA",
+    "22": "PI",
+    "23": "CE",
+    "24": "RN",
+    "25": "PB",
+    "26": "PE",
+    "27": "AL",
+    "28": "SE",
+    "29": "BA",
+    "31": "MG",
+    "32": "ES",
+    "33": "RJ",
+    "35": "SP",
+    "41": "PR",
+    "42": "SC",
+    "43": "RS",
+    "50": "MS",
+    "51": "MT",
+    "52": "GO",
+    "53": "DF",
+}
 
 @dataclass(frozen=True)
 class SIMJob:
@@ -159,12 +188,22 @@ class SIMProcessor:
                         deaths_by_sex.get(str(sex), 0) + int(count)
                     )
 
-            if "UF" in chunk.columns:
-                state_counts = chunk["UF"].value_counts()
+            if "CODMUNRES" in chunk.columns:
+                municipality_codes = (
+                    chunk["CODMUNRES"]
+                    .dropna()
+                    .astype(str)
+                    .str.replace(r"\.0$", "", regex=True)
+                    .str.zfill(6)
+                )
+
+                state_codes = municipality_codes.str[:2]
+                state_names = state_codes.map(UF_BY_IBGE_CODE)
+                state_counts = state_names.value_counts()
 
                 for state, count in state_counts.items():
-                    deaths_by_state[str(state)] = (
-                        deaths_by_state.get(str(state), 0) + int(count)
+                    deaths_by_state[state] = (
+                            deaths_by_state.get(state, 0) + int(count)
                     )
 
         result = {
