@@ -1,4 +1,5 @@
 import json
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from queue import Queue
@@ -6,6 +7,9 @@ from threading import Event, Lock, Thread
 from uuid import uuid4
 
 import pandas as pd
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -35,6 +39,7 @@ class SIMProcessor:
             daemon=True,
         )
         self._worker.start()
+        logger.info("SIM worker started")
 
     def stop(self) -> None:
         if not self._worker:
@@ -44,6 +49,7 @@ class SIMProcessor:
         self._queue.put(None)
         self._worker.join(timeout=5)
         self._worker = None
+        logger.info("SIM worker stopped")
 
     def enqueue(self, csv_file: Path, result_dir: Path) -> dict:
         job_id = str(uuid4())
@@ -57,6 +63,10 @@ class SIMProcessor:
             self._jobs[job_id] = {"status": "queued"}
 
         self._queue.put(job)
+        logger.info(
+            "SIM statistics job queued",
+            extra={"job_id": job_id, "csv_file": str(csv_file)},
+        )
         return self.get_job(job_id)
 
     def get_job(self, job_id: str) -> dict:
@@ -85,6 +95,10 @@ class SIMProcessor:
                 break
 
             self._update_job(job.job_id, status="processing")
+            logger.info(
+                "SIM statistics job processing",
+                extra={"job_id": job.job_id},
+            )
             try:
                 result = self.statistics(job.csv_file)
                 job.result_file.parent.mkdir(parents=True, exist_ok=True)
@@ -99,11 +113,19 @@ class SIMProcessor:
                     status="completed",
                     result_file=str(job.result_file),
                 )
+                logger.info(
+                    "SIM statistics job completed",
+                    extra={"job_id": job.job_id},
+                )
             except Exception as error:
                 self._update_job(
                     job.job_id,
                     status="failed",
                     error=str(error),
+                )
+                logger.exception(
+                    "SIM statistics job failed",
+                    extra={"job_id": job.job_id},
                 )
             finally:
                 self._queue.task_done()
@@ -113,6 +135,10 @@ class SIMProcessor:
             self._jobs[job_id].update(updates)
 
     def statistics(self, csv_file: Path) -> dict:
+        logger.info(
+            "SIM statistics calculation started",
+            extra={"csv_file": str(csv_file)},
+        )
         total_records = 0
         deaths_by_sex = {}
         deaths_by_state = {}
@@ -141,8 +167,13 @@ class SIMProcessor:
                         deaths_by_state.get(str(state), 0) + int(count)
                     )
 
-        return {
+        result = {
             "total_records": total_records,
             "deaths_by_sex": deaths_by_sex,
             "deaths_by_state": deaths_by_state,
         }
+        logger.info(
+            "SIM statistics calculation completed",
+            extra={"csv_file": str(csv_file), "total_records": total_records},
+        )
+        return result
